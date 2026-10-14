@@ -68,13 +68,18 @@ class SessionStore:
             return self._view(self._load(session_id))
 
     def list_sessions(self) -> list[tuple[str, SessionView]]:
+
         with self._lock:
+
             if not self.directory.exists():
                 return []
+
             result = []
-            for path in sorted(self.directory.glob("*.json")):
+
+            for path in sorted(self.directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
                 if _SESSION_ID.fullmatch(path.stem):
                     result.append((path.stem, self._view(self._load(path.stem))))
+
             return result
 
     def next(self, session_id: str) -> tuple[str | None, SessionView]:

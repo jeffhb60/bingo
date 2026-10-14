@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="home-hero">
+  <div class="hero-copy">
+    <p class="eyebrow"><span class="status-dot"></span> YOUR GAME CONTROL CENTER</p>
+    <h1>Bingo Caller</span></h1>
+    <p class="lead">Set up your game, call each draw, and pick up right where you left off. Just the essentials.</p>
+    <div class="button-row">
+      <a class="button button-primary" href="/ui/games">Play a game <span aria-hidden="true">↗</span></a>
+      <a class="button button-outline" href="/ui/sessions">Resume a game</a>
+    </div>
+  </div>
+  <div class="hero-art" aria-hidden="true">
+    <div class="art-top"><span>GAME BOARD</span><span class="art-pip"></span></div>
+    <div class="art-letters">{% for letter in 'BINGO' %}<span>{{ letter }}</span>{% endfor %}</div>
+    <div class="art-line"></div>
+    <div class="art-bottom"><span>READY WHEN YOU ARE</span><span class="arrow-art">↗</span></div>
+  </div>
+</section>
+<div class="section-heading"><div><p class="eyebrow">GET STARTED</p><h2>Everything in one place.</h2></div></div>
+<section class="action-grid" aria-label="Main actions">
+  <a class="action-card" href="/ui/games"><span class="action-icon">▶</span><span class="action-name">Play game</span><span class="action-desc">Choose a game and start calling.</span><span class="action-arrow">↗</span></a>
+  <a class="action-card" href="/ui/create-game"><span class="action-icon">＋</span><span class="action-name">Create game</span><span class="action-desc">Build a custom five-letter game.</span><span class="action-arrow">↗</span></a>
+  <a class="action-card" href="/ui/config"><span class="action-icon">⚙</span><span class="action-name">Settings</span><span class="action-desc">Choose how much history to show.</span><span class="action-arrow">↗</span></a>
+</section>
+<section class="home-bottom">
+  <div class="compact-stat"><span class="stat-value">{{ game_count }}</span><span class="stat-label">Saved game templates</span></div>
+  <div class="compact-stat"><span class="stat-value">{{ session_count }}</span><span class="stat-label">Saved sessions</span></div>
+  <div class="recent-panel">
+    <div class="panel-title-row"><h3>Continue playing</h3><a class="text-link" href="/ui/sessions">View all ↗</a></div>
+    {% if recent_sessions %}
+      {% for sid, view in recent_sessions %}
+        <a class="recent-item" href="/ui/sessions/{{ sid }}"><span><strong>{{ view.name }}</strong><small>{{ view.drawn }} of {{ view.total }} called</small></span><span class="recent-arrow">↗</span></a>
+      {% endfor %}
+    {% else %}
+      <p class="muted small">No sessions yet. Your active games will appear here.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

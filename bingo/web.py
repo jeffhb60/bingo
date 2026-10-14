@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 from .sessions import SessionStore, SessionView
 from .storage import CONFIG_PATH, GAME_DIR, list_games, load_config, save_config, save_game
@@ -45,7 +46,7 @@ def create_app(
     config_path: Path = CONFIG_PATH,
     session_directory: Path | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Bingo Studio", description="JSON-based Bingo caller with minimal HTML forms")
+    app = FastAPI(title="Bingo Studio", description="JSON-based Bingo caller with a minimal web UI")
     sessions = SessionStore(session_directory or Path(game_directory).parent / "sessions")
 
     def available_games() -> list[tuple[Path, dict]]:
@@ -209,7 +210,11 @@ def create_app(
         count = sessions.clear()
         return f"Cleared {count} saved session(s). Game definitions are unchanged.\n"
 
-    app.include_router(build_ui_router(sessions, available_games, find_game))
+    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+    app.include_router(build_ui_router(
+        sessions, available_games, find_game,
+        game_directory=Path(game_directory), config_path=Path(config_path),
+    ))
     return app
 
 app = create_app()

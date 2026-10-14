@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Play games{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">GAME LIBRARY</p><h1>Choose your game.</h1><p class="subline">Select a template to preview, then start calling.</p></div><a class="button button-outline" href="/ui/create-game">＋ New game</a></div>
+{% if games %}
+<div class="game-grid">
+  {% for item in games %}
+    <a class="game-card" href="/play/{{ item.id|url_path }}">
+      <div class="card-top"><span class="tag">GAME TEMPLATE</span><span class="external-arrow">↗</span></div>
+      <div class="letter-row">{% for letter in item.game.word %}<span>{{ letter }}</span>{% endfor %}</div>
+      <h2>{{ item.game.name }}</h2>
+      <p class="muted">{{ item.total }} possible calls · {% if item.game.free_center %}Free center{% else %}No free center{% endif %}</p>
+      <div class="card-bottom">Preview game <span>→</span></div>
+    </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h2>No games yet</h2><p>Create or import a game to get started.</p><a class="button button-primary" href="/ui/create-game">Create game</a></div>
+{% endif %}
+{% endblock %}

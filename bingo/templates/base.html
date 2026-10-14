@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b101b">
+  <title>{% block title %}Bingo Studio{% endblock %} · Bingo Studio</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+</head>
+<body>
+  <div class="site-shell">
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="Bingo Studio home"><span class="brand-mark">B</span><span>BINGO<span class="brand-light">STUDIO</span></span></a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="/" {% if active == 'home' %}aria-current="page"{% endif %}>Home</a>
+          <a href="/ui/games" {% if active == 'play' %}aria-current="page"{% endif %}>Play</a>
+          <a href="/ui/sessions" {% if active == 'sessions' %}aria-current="page"{% endif %}>Sessions</a>
+          <a href="/ui/create-game" {% if active == 'create' %}aria-current="page"{% endif %}>Create</a>
+          <a href="/ui/config" {% if active == 'config' %}aria-current="page"{% endif %}>Settings</a>
+        </nav>
+      </div>
+    </header>
+    <main class="content" id="main-content">{% block content %}{% endblock %}</main>
+    <footer class="footer"><span>Bingo Studio</span><span>Local game control · <a href="/docs">API docs</a></span></footer>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

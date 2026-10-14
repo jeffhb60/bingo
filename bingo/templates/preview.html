@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}{{ game.name }}{% endblock %}
+{% block content %}
+<a class="back-link" href="/ui/games">← All games</a>
+<div class="page-heading preview-heading"><div><p class="eyebrow">GAME PREVIEW</p><h1>{{ game.name }}</h1><p class="subline">{{ total }} available calls · {% if game.free_center %}Free center enabled{% else %}No free center{% endif %}</p></div>
+<form method="post" action="/ui/start/{{ game_id|url_path }}"><button class="button button-primary" type="submit">Start game <span aria-hidden="true">→</span></button></form></div>
+<div class="preview-letters" aria-label="Game header">{% for letter in game.word %}<span>{{ letter }}</span>{% endfor %}</div>
+<div class="section-heading"><div><p class="eyebrow">CALL POOL</p><h2>What’s in this game</h2></div></div>
+<div class="column-grid">
+  {% for col in game.columns %}
+    <div class="column-card"><div class="column-letter">{{ col.letter }} <span>{{ col['items']|length }} calls</span></div>
+      <ul>{% for item in col['items'][:5] %}<li>{{ item }}</li>{% endfor %}</ul>
+      {% if col['items']|length > 5 %}<span class="more-text">+ {{ col['items']|length - 5 }} more</span>{% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
