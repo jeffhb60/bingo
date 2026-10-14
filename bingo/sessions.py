@@ -1,8 +1,20 @@
+# Disk-backed draw sessions: one JSON snapshot per session.
+
+# The JSON files, not a Python cache, are the source of truth.
+# A thread lock serializes drawing for a single server process.
+# Use one Uvicorn worker only.
+
+import json
 from dataclasses import dataclass
+from pathlib import Path
+import re
 from threading import RLock
 from uuid import uuid4
 
 from .game import GameSession
+from .storage import SESSION_DIR, write_json_atomic
+
+_SESSION_ID = re.compile(r"[0-9a-f]{32}\Z")
 
 @dataclass(frozen=True)
 class SessionView:
@@ -19,38 +31,83 @@ class SessionView:
         return self.total - self.remaining
 
 class SessionStore:
-    def __init__(self) -> None:
+
+    def __init__(self, directory: Path = SESSION_DIR) -> None:
+        self.directory = Path(directory)
         self._lock = RLock()
-        self._sessions: dict[str, GameSession] = {}
+
+    def _path(self, session_id: str) -> Path:
+        if not _SESSION_ID.fullmatch(session_id):
+            raise KeyError("Game session not found.")
+        return self.directory / f"{session_id}.json"
+
+    def _load(self, session_id: str) -> GameSession:
+        try:
+            content = json.loads(self._path(session_id).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            raise KeyError("Game session not found. Start a new game or view saved sessions.") from None
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Saved session {session_id} is unreadable: {exc}") from exc
+        try:
+            return GameSession.from_snapshot(content)
+        except ValueError as exc:
+            raise ValueError(f"Saved session {session_id} is invalid: {exc}") from exc
+
+    def _save(self, session_id: str, session: GameSession) -> None:
+        write_json_atomic(self._path(session_id), session.snapshot())
 
     def start(self, game: dict) -> tuple[str, SessionView]:
         session = GameSession(game)
-        session_id = uuid4().hex
         with self._lock:
-            self._sessions[session_id] = session
+            session_id = uuid4().hex
+            self._save(session_id, session)
             return session_id, self._view(session)
 
     def status(self, session_id: str) -> SessionView:
         with self._lock:
-            return self._view(self._lookup(session_id))
+            return self._view(self._load(session_id))
+
+    def list_sessions(self) -> list[tuple[str, SessionView]]:
+        with self._lock:
+            if not self.directory.exists():
+                return []
+            result = []
+            for path in sorted(self.directory.glob("*.json")):
+                if _SESSION_ID.fullmatch(path.stem):
+                    result.append((path.stem, self._view(self._load(path.stem))))
+            return result
 
     def next(self, session_id: str) -> tuple[str | None, SessionView]:
         with self._lock:
-            session = self._lookup(session_id)
+            session = self._load(session_id)
             call = session.next_call()
+            if call is not None:
+                self._save(session_id, session)
             return (str(call) if call is not None else None), self._view(session)
 
     def reset(self, session_id: str) -> SessionView:
         with self._lock:
-            session = self._lookup(session_id)
+            session = self._load(session_id)
             session.reset()
+            self._save(session_id, session)
             return self._view(session)
 
-    def _lookup(self, session_id: str) -> GameSession:
-        try:
-            return self._sessions[session_id]
-        except KeyError:
-            raise KeyError("Game session not found. Start a new game at POST /play/{game_id}.") from None
+    def delete(self, session_id: str) -> None:
+        with self._lock:
+            try:
+                self._path(session_id).unlink()
+            except FileNotFoundError:
+                raise KeyError("Game session not found.") from None
+
+    # Delete only recognized session JSONs. Never touch game definitions.
+    def clear(self) -> int:
+        with self._lock:
+            if not self.directory.exists():
+                return 0
+            paths = [p for p in self.directory.glob("*.json") if _SESSION_ID.fullmatch(p.stem)]
+            for path in paths:
+                path.unlink()
+            return len(paths)
 
     @staticmethod
     def _view(session: GameSession) -> SessionView:

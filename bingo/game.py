@@ -1,4 +1,8 @@
-from dataclasses import dataclass
+# Game rules, random drawing, and validated session snapshots.
+# Game contents come entirely from JSON definitions, not hardcoded number ranges.
+
+from collections import Counter
+from dataclasses import asdict, dataclass
 import random
 
 @dataclass(frozen=True)
@@ -11,7 +15,7 @@ class Call:
         divider = "-" if self.value.isdecimal() else ": "
         return f"{self.letter}{divider}{self.value}"
 
-# Return a normalized game definition or raise ValueError.
+# Normalize a five-column game definition or raise ValueError.
 def validate_game(data: dict) -> dict:
     if not isinstance(data, dict):
         raise ValueError("Game JSON must be an object.")
@@ -62,12 +66,12 @@ def validate_game(data: dict) -> dict:
         "columns": normalized,
     }
 
-# A play session: one shuffled deck plus an advancing cursor.
+# One shuffled deck and a cursor. Each call is drawn exactly once.
 class GameSession:
 
     def __init__(self, game: dict, *, rng: random.Random | None = None):
         self.game = validate_game(game)
-        self.rng = rng or random.Random()
+        self.rng = rng if rng is not None else random.Random()
         self.reset()
 
     def reset(self) -> None:
@@ -85,7 +89,7 @@ class GameSession:
 
     @property
     def history(self) -> list[Call]:
-        return self.deck[: self.cursor]
+        return self.deck[:self.cursor]
 
     @property
     def previous(self) -> Call | None:
@@ -97,3 +101,40 @@ class GameSession:
         call = self.deck[self.cursor]
         self.cursor += 1
         return call
+
+    # Snapshot exact draw order + progress for a restart-safe session.
+    def snapshot(self) -> dict:
+        return {
+            "version": 1,
+            "game": self.game,  # Preserve game rules even if its source JSON changes.
+            "deck": [asdict(call) for call in self.deck],
+            "cursor": self.cursor,
+        }
+
+    # Restore and validate a saved shuffle; never reshuffle a resumed game.
+    @classmethod
+    def from_snapshot(cls, data: dict) -> "GameSession":
+        if not isinstance(data, dict) or type(data.get("version")) is not int or data["version"] != 1:
+            raise ValueError("Unsupported or invalid saved-session format.")
+        game = validate_game(data.get("game"))
+        raw_deck = data.get("deck")
+        cursor = data.get("cursor")
+        if not isinstance(raw_deck, list) or type(cursor) is not int or not 0 <= cursor <= len(raw_deck):
+            raise ValueError("Saved session has an invalid deck or cursor.")
+        try:
+            deck = [Call(**item) for item in raw_deck]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Saved session has malformed calls.") from exc
+        expected = Counter(
+            Call(i, column["letter"], value)
+            for i, column in enumerate(game["columns"])
+            for value in column["items"]
+        )
+        if Counter(deck) != expected:
+            raise ValueError("Saved session deck does not match its game definition.")
+        # Constructor initializes the RNG for future resets; restore exact saved deck.
+        session = cls(game)
+        session.deck = deck
+        session.cursor = cursor
+        return session
+

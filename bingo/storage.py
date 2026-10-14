@@ -1,11 +1,15 @@
+# Read/write human-editable .json definitions. Using flat-file customization instead of database.
+
 import json
 from pathlib import Path
 import re
+from uuid import uuid4
 
 from .game import validate_game
 
 ROOT = Path(__file__).resolve().parent.parent
 GAME_DIR = ROOT / "games"
+SESSION_DIR = ROOT / "sessions"
 CONFIG_PATH = ROOT / "config.json"
 DEFAULT_CONFIG = {"history_limit": 5}
 
@@ -35,14 +39,7 @@ def save_game(data: dict, directory: Path = GAME_DIR) -> Path:
     while path.exists():
         path = directory / f"{slug}_{counter}.json"
         counter += 1
-    # Atomic replace prevents leaving behind incomplete JSON if interrupted.
-    temp = path.with_suffix(".tmp")
-    try:
-        temp.write_text(json.dumps(game, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        temp.replace(path)
-    finally:
-        if temp.exists():
-            temp.unlink()
+    write_json_atomic(path, game)
     return path
 
 def load_config(path: Path = CONFIG_PATH) -> dict:
@@ -60,4 +57,15 @@ def save_config(config: dict, path: Path = CONFIG_PATH) -> None:
     limit = config.get("history_limit")
     if type(limit) is not int or not 0 <= limit <= 50:
         raise ValueError("history_limit must be an integer between 0 and 50.")
-    path.write_text(json.dumps({"history_limit": limit}, indent=2) + "\n", encoding="utf-8")
+    write_json_atomic(path, {"history_limit": limit})
+
+# Save JSON via a temporary file and atomic replacement (single-host storage).
+def write_json_atomic(path: Path, data: dict) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)

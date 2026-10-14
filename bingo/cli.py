@@ -1,6 +1,6 @@
-"""Terminal interface. Later a web UI can call storage.py and game.py directly."""
+# Terminal interface (Command Line Interface)
 
-from .game import GameSession
+from .sessions import SessionStore
 from .storage import list_games, save_game, load_config, save_config
 
 def print_game_list(games):
@@ -58,40 +58,69 @@ def create_game() -> None:
     except ValueError as exc:
         print(f"Unable to save game: {exc}")
 
-def play_game(history_limit: int) -> None:
-    game = choose_game()
-    if game is None:
-        return
-    session = GameSession(game)
-    print(f"\nPlaying: {game['name']} [{game['word']}]")
-    print("Press Enter = next draw | h = all history | r = restart | q = menu")
+def _run_session(store: SessionStore, session_id: str, history_limit: int) -> None:
+    view = store.status(session_id)
+    print(f"\nPlaying: {view.name} [{view.word}]\nSession: {session_id}")
+    print("Enter = next draw | h = all history | r = restart | q = menu")
     while True:
         command = input("\nCommand: ").strip().lower()
         if command == "q":
+            print("Session saved; resume it later using menu option 5.")
             return
         if command == "h":
-            print("Draw history: " + (", ".join(map(str, session.history)) or "(none yet)"))
+            view = store.status(session_id)
+            print("Draw history: " + (", ".join(view.history) or "(none yet)"))
             continue
         if command == "r":
             if input("Reshuffle and clear draw history? [y/N]: ").strip().lower() == "y":
-                session.reset()
-                print("Game restarted.")
+                store.reset(session_id)
+                print("Game restarted and saved.")
             continue
         if command:
             print("Unknown command.")
             continue
-        if not session.remaining:
-            print("All calls have been drawn! Choose r to restart, or q to exit.")
+        called, view = store.next(session_id)
+        if called is None:
+            print("All calls drawn! Choose r to restart or q to exit.")
             continue
-        previous = session.previous
-        called = session.next_call()
-        if previous:
-            print(f"Previous: {previous}")
+        if view.previous:
+            print(f"Previous: {view.previous}")
         print(f"\n  >>> {called} <<<")
-        print(f"Draw {session.cursor} / {len(session.deck)}  |  Remaining: {session.remaining}")
+        print(f"Draw {view.drawn} / {view.total} | Remaining: {view.remaining}")
         if history_limit:
-            recent = session.history[-history_limit:]
-            print("Recent: " + ", ".join(map(str, recent)))
+            print("Recent: " + ", ".join(view.history[-history_limit:]))
+
+def play_game(history_limit: int) -> None:
+    game = choose_game()
+    if game is None:
+        return
+    store = SessionStore()
+    session_id, _ = store.start(game)
+    _run_session(store, session_id, history_limit)
+
+def resume_game(history_limit: int) -> None:
+    store = SessionStore()
+    sessions = store.list_sessions()
+    if not sessions:
+        print("No saved sessions.")
+        return
+    print("\nSaved sessions:")
+    for index, (_, view) in enumerate(sessions, start=1):
+        print(f"  {index}. {view.name} [{view.word}] - {view.drawn}/{view.total} drawn")
+    answer = input("Select a session number (blank to cancel): ").strip()
+    if answer.isdecimal() and 1 <= int(answer) <= len(sessions):
+        _run_session(store, sessions[int(answer) - 1][0], history_limit)
+    elif answer:
+        print("Invalid selection.")
+
+def clear_sessions() -> None:
+    store = SessionStore()
+    count = len(store.list_sessions())
+    answer = input(f"Delete all {count} session(s)? This cannot be undone. Type CLEAR to confirm: ")
+    if answer == "CLEAR":
+        print(f"Deleted {store.clear()} saved sessions. Game JSON files were kept.")
+    else:
+        print("Cancelled.")
 
 def configure(config: dict) -> None:
     print(f"\nCONFIGURATION — recent calls shown: {config['history_limit']}")
@@ -119,6 +148,8 @@ def main():
         print("2. Create game")
         print("3. Play game")
         print("4. List saved games")
+        print("5. Resume saved game")
+        print("6. Clear saved sessions")
         print("Q. Quit")
         selection = input("Select: ").strip().lower()
         if selection == "1":
@@ -129,8 +160,12 @@ def main():
             play_game(config["history_limit"])
         elif selection == "4":
             print_game_list(list_games())
+        elif selection == "5":
+            resume_game(config["history_limit"])
+        elif selection == "6":
+            clear_sessions()
         elif selection == "q":
             print("Goodbye!")
             return
         else:
-            print("Choose 1, 2, 3, 4, or Q.")
+            print("Choose 1, 2, 3, 4, 5, 6, or Q.")
