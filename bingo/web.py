@@ -1,9 +1,10 @@
 import json
 from pathlib import Path
+from html import escape
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse
 
 from .sessions import SessionStore, SessionView
 from .storage import (
@@ -85,6 +86,7 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH)
             "GET  /games        - List game definitions\n"
             "GET  /games/{id}   - View game details\n"
             "GET  /play         - Choose a saved game\n"
+            "GET  /play/{id}    - Preview a saved game\n"
             "POST /play/{id}    - Start a draw session\n"
             "GET  /sessions/{session_id} - View the current draw\n"
             "\nUse /docs to send POST/PUT requests, or use curl.\n"
@@ -137,7 +139,12 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH)
             path = save_game(body, game_directory)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return f"Saved game: {path.name}\nView: GET /games/{path.stem}\nPlay: POST /play/{path.stem}\n"
+        return (
+            f"Saved game: {path.name}\n"
+            f"View: GET /games/{path.stem}\n"
+            f"Preview: GET /play/{path.stem}\n"
+            f"Start: POST /play/{path.stem}\n"
+        )
 
     @app.get("/games", response_class=PlainTextResponse)
     def games() -> str:
@@ -147,7 +154,8 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH)
         lines = ["SAVED GAMES"]
         for path, game in entries:
             lines.append(" - ".join(_game_lines(path.stem, game)))
-            lines.append(f"   View: GET /games/{path.stem} | Start: POST /play/{path.stem}")
+            lines.append(f"   View: GET /games/{path.stem} | Preview: GET /play/{path.stem}")
+            lines.append(f"   Start: POST /play/{path.stem} (use /docs)")
         return "\n".join(lines) + "\n"
 
     @app.get("/games/{game_id}", response_class=PlainTextResponse)
@@ -157,17 +165,44 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH)
         lines.append(f"Free center: {game['free_center']}")
         for index, column in enumerate(game["columns"], start=1):
             lines.append(f"Column {index} ({column['letter']}): " + ", ".join(column["items"]))
-        lines.append(f"\nStart playing: POST /play/{game_id}")
+        lines.append(f"\nPreview: GET /play/{game_id}")
+        lines.append(f"Start playing: POST /play/{game_id} (use /docs)")
         return "\n".join(lines) + "\n"
 
-    @app.get("/play", response_class=PlainTextResponse)
-    def play_menu() -> str:
-        entries = available_games()
-        lines = ["PLAY GAME", "Choose a saved game:"]
-        if not entries:
-            lines.append("No games available. POST /create-game to add one.")
-        for path, game in entries:
-            lines.append(f"{game['name']} [{game['word']}]: POST /play/{path.stem}")
+    @app.get("/play/{game_id}", response_class=HTMLResponse)
+    def preview_game(game_id: str):
+        game = find_game(game_id)
+
+        return f"""
+        <h1>GAME PREVIEW</h1>
+
+        <h2>{escape(game["name"])}</h2>
+
+        <p>Word: {escape(game["word"])}</p>
+        <p>Free center: {game["free_center"]}</p>
+
+        <form method="post" action="/ui/start/{escape(game_id, quote=True)}">
+            <button type="submit">Start Game</button>
+        </form>
+        """
+
+    @app.get("/play/{game_id}", response_class=PlainTextResponse)
+    def preview_game(game_id: str) -> str:
+        """Browser-friendly, read-only preview; never start sessions on GET."""
+        game = find_game(game_id)
+        lines = ["GAME PREVIEW", *_game_lines(game_id, game), f"Free center: {game['free_center']}", "Columns:"]
+        for column in game["columns"]:
+            lines.append(f"  {column['letter']}: {len(column['items'])} available calls")
+        lines.extend(
+            [
+                "",
+                "This is a preview; no session has been started.",
+                f"To start: POST /play/{game_id}",
+                f"In your browser, open http://127.0.0.1:8000/docs",
+                f"then use POST /play/{{game_id}} with game_id = {game_id}.",
+                "For more information: GET /games/" + game_id,
+            ]
+        )
         return "\n".join(lines) + "\n"
 
     @app.post("/play/{game_id}", response_class=PlainTextResponse, status_code=201)
@@ -203,7 +238,6 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH)
         if not view.history:
             lines.append("(no calls yet)")
         return "\n".join(lines) + "\n"
-
     @app.post("/sessions/{session_id}/reset", response_class=PlainTextResponse)
     def reset_session(session_id: str) -> str:
         try:
@@ -212,6 +246,66 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH)
             raise HTTPException(status_code=404, detail=str(exc.args[0])) from exc
         return "\n".join(["SESSION RESET", *_session_lines(session_id, view, config()["history_limit"])]) + "\n"
 
-    return app
+    # Start a new game
+    @app.post("/ui/start/{game_id}")
+    def ui_start_game(game_id: str):
+        game = find_game(game_id)
 
+        session_id, view = sessions.start(game)
+
+        return RedirectResponse(
+            url=f"/ui/sessions/{session_id}",
+            status_code=303
+        )
+
+    # Display the current game
+    @app.get("/ui/sessions/{session_id}", response_class=HTMLResponse)
+    def ui_game_session(session_id: str):
+        view = status(session_id)
+
+        history = "\n".join(
+            f"{i}. {call}"
+            for i, call in enumerate(view.history, start=1)
+        ) or "(none yet)"
+
+        draw_button = (
+            f'<form method="post" action="/ui/sessions/{session_id}/next">'
+            '<button type="submit">Draw Next Number</button>'
+            '</form>'
+            if view.remaining > 0
+            else "<p>All numbers have been drawn!</p>"
+        )
+
+        return f"""
+        <h1>{escape(view.name)}</h1>
+
+        <h2>Current Draw</h2>
+        <h1>{escape(view.current or "Not started")}</h1>
+
+        <p>Previous: {escape(view.previous or "None")}</p>
+
+        <p>Drawn: {view.drawn} / {view.total}</p>
+        <p>Remaining: {view.remaining}</p>
+
+        {draw_button}
+
+        <h3>Draw History</h3>
+        <pre>{escape(history)}</pre>
+
+        <p><a href="/play">Back to games</a></p>
+        """
+
+    # Draw the next number
+    @app.post("/ui/sessions/{session_id}/next")
+    def ui_next_draw(session_id: str):
+
+        # Reuse our existing draw endpoint logic
+        next_draw(session_id)
+
+        return RedirectResponse(
+            url=f"/ui/sessions/{session_id}",
+            status_code=303
+        )
+
+    return app
 app = create_app()
