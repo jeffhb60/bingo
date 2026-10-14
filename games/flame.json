@@ -1,0 +1,62 @@
+{
+  "name": "FLAME Night",
+  "word": "FLAME",
+  "free_center": true,
+  "columns": [
+    {
+      "letter": "F",
+      "items": [
+        "Fire",
+        "Forest",
+        "Friendship",
+        "Festival",
+        "Fountain",
+        "Falcon"
+      ]
+    },
+    {
+      "letter": "L",
+      "items": [
+        "Lantern",
+        "Lightning",
+        "Lighthouse",
+        "Lavender",
+        "Laughter",
+        "Library"
+      ]
+    },
+    {
+      "letter": "A",
+      "items": [
+        "Adventure",
+        "Aurora",
+        "Astronaut",
+        "Apple",
+        "Autumn",
+        "Artist"
+      ]
+    },
+    {
+      "letter": "M",
+      "items": [
+        "Mountain",
+        "Moonlight",
+        "Meteor",
+        "Melody",
+        "Mystery",
+        "Meadow"
+      ]
+    },
+    {
+      "letter": "E",
+      "items": [
+        "Emerald",
+        "Eclipse",
+        "Echo",
+        "Energy",
+        "Explorer",
+        "Evening"
+      ]
+    }
+  ]
+}
