@@ -1,3 +1,5 @@
+# Run the text based CLI.
+
 from bingo.cli import main
 
 if __name__ == "__main__":
