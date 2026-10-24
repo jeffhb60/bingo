@@ -4,14 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b101b">
-  <title>{% block title %}Bingo Studio{% endblock %} · Bingo Studio</title>
+  <meta name="description" content="UUFA Bingo">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='/chalice-mark.svg') }}">
+  <title>{% block title %}UUFA FLAME - Bingo Studio{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
 </head>
 <body>
   <div class="site-shell">
     <header class="site-header">
       <div class="header-inner">
-        <a class="brand" href="/" aria-label="Bingo Studio home"><span class="brand-mark">B</span><span>BINGO<span class="brand-light">STUDIO</span></span></a>
+        <a class="brand" href="/" aria-label="Bingo Studio home"><img class="brand-symbol brand-uufa" src="{{ url_for('static', path='/uufa-logo.png') }}" alt="UUFA stained-glass chalice emblem" width="42" height="42"><span class="brand-names"><span>UUFA<span class="brand-light">FLAME BINGO</span></span><small></small></span></a>
         <nav class="main-nav" aria-label="Main navigation">
           <a href="/" {% if active == 'home' %}aria-current="page"{% endif %}>Home</a>
           <a href="/ui/games" {% if active == 'play' %}aria-current="page"{% endif %}>Play</a>
@@ -22,7 +24,7 @@
       </div>
     </header>
     <main class="content" id="main-content">{% block content %}{% endblock %}</main>
-    <footer class="footer"><span>Bingo Studio</span><span>Local game control · <a href="/docs">API docs</a></span></footer>
+    <footer class="footer"><span><a href="/docs">API docs</a></span></footer>
   </div>
   {% block scripts %}{% endblock %}
 </body>

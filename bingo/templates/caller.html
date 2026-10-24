@@ -4,7 +4,7 @@
 <div class="caller-heading"><div><a class="back-link" href="/ui/sessions">← All sessions</a><p class="eyebrow"><span class="status-dot"></span> {% if view.remaining %}GAME IN PROGRESS{% else %}GAME COMPLETE{% endif %}</p><h1>{{ view.name }}</h1></div><div class="top-actions"><a href="/ui/sessions/{{ session_id }}/reset" class="button button-outline button-small">↻ Reset</a><a href="/ui/sessions/{{ session_id }}/delete" class="button button-quiet button-small">Delete</a></div></div>
 <div class="caller-layout">
   <section class="draw-stage" aria-label="Current bingo draw">
-    <div class="draw-stage-top"><span>NOW CALLING</span><span>{{ view.word }}</span></div>
+    <div class="draw-stage-top"><span>NOW CALLING</span><span class="stage-brand"><img src="{{ url_for('static', path='/chalice-mark.svg') }}" alt="" width="25" height="25"> UUFA GAME NIGHT · {{ view.word }}</span></div>
     <div class="draw-area">
       <div class="previous-call"><span>PREVIOUS</span><strong>{{ view.previous or '—' }}</strong></div>
       <p class="draw-caption">CURRENT DRAW</p>

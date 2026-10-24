@@ -13,6 +13,6 @@
 </div>
 <div class="danger-footer"><span>Only finished with these sessions?</span><a href="/ui/sessions/clear">Clear all session history →</a></div>
 {% else %}
-<div class="empty-state"><div class="empty-circle">↺</div><h2>No saved sessions</h2><p>Start a game, and it will appear here automatically.</p><a class="button button-primary" href="/ui/games">Choose a game →</a></div>
+<div class="empty-state"><img class="empty-art" src="{{ url_for('static', path='/stained-glass-chalice.webp') }}" alt="" width="112" height="112" loading="lazy"><h2>No saved sessions</h2><p>Start a game, and it will appear here automatically.</p><a class="button button-primary" href="/ui/games">Choose a game →</a></div>
 {% endif %}
 {% endblock %}
