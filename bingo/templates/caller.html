@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Calling {{ view.name }}{% endblock %}
 {% block content %}
-<div class="caller-heading"><div><a class="back-link" href="/ui/sessions">← All sessions</a><p class="eyebrow"><span class="status-dot"></span> {% if view.remaining %}GAME IN PROGRESS{% else %}GAME COMPLETE{% endif %}</p><h1>{{ view.name }}</h1></div><div class="top-actions"><a href="/ui/sessions/{{ session_id }}/reset" class="button button-outline button-small">↻ Reset</a><a href="/ui/sessions/{{ session_id }}/delete" class="button button-quiet button-small">Delete</a></div></div>
+<div class="caller-heading"><div><a class="back-link" href="/ui/sessions">← All sessions</a><p class="eyebrow"><span class="status-dot"></span> {% if view.remaining %}GAME IN PROGRESS{% else %}GAME COMPLETE{% endif %}</p><h1>{{ view.name }}</h1></div><div class="top-actions"><a href="/ui/sessions/{{ session_id }}/matrix" class="button button-primary button-small" data-open-matrix>✓ Check {{ view.word }} calls</a><a href="/ui/sessions/{{ session_id }}/reset" class="button button-outline button-small">↻ Reset</a><a href="/ui/sessions/{{ session_id }}/delete" class="button button-quiet button-small">Delete</a></div></div>
 <div class="caller-layout">
   <section class="draw-stage" aria-label="Current bingo draw">
     <div class="draw-stage-top"><span>NOW CALLING</span><span class="stage-brand"><img src="{{ url_for('static', path='/chalice-mark.svg') }}" alt="" width="25" height="25"> UUFA GAME NIGHT · {{ view.word }}</span></div>
@@ -30,4 +30,32 @@
     {% endif %}
   </aside>
 </div>
+
+<dialog id="call-matrix-dialog" class="matrix-modal" aria-labelledby="matrix-modal-title" aria-describedby="matrix-modal-description">
+  <div class="matrix-modal-header">
+    <div>
+      <p class="eyebrow">SOMEONE CALLED {{ view.word }}?</p>
+      <h2 id="matrix-modal-title">Check the calls</h2>
+      <p id="matrix-modal-description">✓ marks calls already drawn. The gold outline marks the most recent call.</p>
+    </div>
+    <form method="dialog">
+      <button type="submit" class="matrix-modal-close" aria-label="Close call matrix" title="Close (Esc)">×</button>
+    </form>
+  </div>
+  <div class="matrix-modal-content">
+    <div class="matrix-modal-summary">
+      <span><strong>{{ matrix.drawn }}</strong> / {{ matrix.total }} drawn</span>
+      <span>{{ matrix.remaining }} remaining</span>
+      <span>Latest: <strong>{{ matrix.current or '—' }}</strong></span>
+    </div>
+    {% set matrix_embedded = true %}
+    {% include '_matrix_grid.html' %}
+    <p class="matrix-modal-note">This checks which calls were drawn; it does not automatically verify a player's card.</p>
+  </div>
+  <div class="matrix-modal-footer">
+    <a class="back-link" href="/ui/sessions/{{ session_id }}/matrix">Open printable full page ↗</a>
+    <form method="dialog"><button type="submit" class="button button-outline button-small">Close</button></form>
+  </div>
+</dialog>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', path='/matrix-modal.js') }}" defer></script>{% endblock %}

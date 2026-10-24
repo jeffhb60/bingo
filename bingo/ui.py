@@ -15,8 +15,10 @@ from .storage import load_config, save_config, save_game
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 TEMPLATES.env.filters["url_path"] = lambda value: quote(str(value), safe="")
 
+
 def _page(request: Request, template: str, **context):
     return TEMPLATES.TemplateResponse(request=request, name=template, context=context)
+
 
 def _status(store: SessionStore, session_id: str) -> SessionView:
     try:
@@ -24,14 +26,16 @@ def _status(store: SessionStore, session_id: str) -> SessionView:
     except KeyError as exc:
         raise HTTPException(404, str(exc.args[0])) from exc
 
+
 def _action(callback, session_id: str):
     try:
         return callback(session_id)
     except KeyError as exc:
         raise HTTPException(404, str(exc.args[0])) from exc
 
-# Name inputs by position, not by letter: APPLE contains two P columns.
+
 def _column_fields(word: str, values: list[str]) -> list[dict]:
+    # Name inputs by position, not by letter: APPLE contains two P columns.
     labels = word.upper() if len(word) == 5 and word.isascii() and word.isalpha() else "FLAME"
     return [{"number": i + 1, "index": i, "letter": labels[i], "text": values[i]} for i in range(5)]
 
@@ -80,10 +84,17 @@ def build_ui_router(store: SessionStore, available_games, find_game, *, game_dir
 
     @router.get("/ui/sessions/{session_id}", response_class=HTMLResponse)
     def current_game(request: Request, session_id: str):
-        view = _status(store, session_id)
+        view, matrix = _action(store.overview, session_id)
         history = list(reversed(list(enumerate(view.history, start=1))))
         return _page(request, "caller.html", active="sessions", session_id=session_id,
-                     view=view, history=history, percentage=round(view.drawn / view.total * 100))
+                     view=view, matrix=matrix, history=history,
+                     percentage=round(view.drawn / view.total * 100))
+
+    @router.get("/ui/sessions/{session_id}/matrix", response_class=HTMLResponse)
+    def called_matrix(request: Request, session_id: str):
+        matrix = _action(store.matrix, session_id)
+        return _page(request, "matrix.html", active="sessions", session_id=session_id,
+                     matrix=matrix)
 
     @router.post("/ui/sessions/{session_id}/next")
     def draw_next(session_id: str):
@@ -152,38 +163,28 @@ def build_ui_router(store: SessionStore, available_games, find_game, *, game_dir
             "columns": [{"letter": labels[i], "items": [s.strip() for s in text.splitlines() if s.strip()]}
                         for i, text in enumerate(raw_values)],
         }
-
         try:
             path = save_game(data, game_directory)
-
         except ValueError as exc:
             return _page(request, "create.html", active="create", name=name, word=word,
                          free_center=free_center, columns=_column_fields(word, raw_values), error=str(exc))
-
         return RedirectResponse(f"/play/{quote(path.stem, safe='')}", status_code=303)
 
     @router.post("/ui/import-game", response_class=HTMLResponse)
     async def import_game(request: Request, file: UploadFile = File(...)):
-
         try:
             if not (file.filename or "").lower().endswith(".json"):
                 raise ValueError("Choose a .json game definition file.")
-
             content = await file.read(256 * 1024 + 1)
-
             if len(content) > 256 * 1024:
                 raise ValueError("The JSON file must be 256 KB or smaller.")
-
             game = json.loads(content.decode("utf-8-sig"))
             path = save_game(game, game_directory)
-
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
             return _page(request, "create.html", active="create", name="", word="FLAME", free_center=True,
                          columns=_column_fields("FLAME", [""] * 5), import_error=str(exc))
-
         finally:
             await file.close()
-
         return RedirectResponse(f"/play/{quote(path.stem, safe='')}", status_code=303)
 
     return router
