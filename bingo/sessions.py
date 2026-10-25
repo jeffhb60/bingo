@@ -11,7 +11,7 @@ import re
 from threading import RLock
 from uuid import uuid4
 
-from .game import GameSession
+from .game import Call, GameSession
 from .storage import SESSION_DIR, write_json_atomic
 
 _SESSION_ID = re.compile(r"[0-9a-f]{32}\Z")
@@ -30,8 +30,35 @@ class SessionView:
     def drawn(self) -> int:
         return self.total - self.remaining
 
-class SessionStore:
+@dataclass(frozen=True)
+class MatrixCell:
+    value: str
+    drawn: bool
+    latest: bool
 
+@dataclass(frozen=True)
+class MatrixColumn:
+    letter: str
+    cells: tuple[MatrixCell, ...]
+
+@dataclass(frozen=True)
+class MatrixView:
+    name: str
+    word: str
+    columns: tuple[MatrixColumn, ...]
+    drawn: int
+    total: int
+    current: str | None
+
+    @property
+    def remaining(self) -> int:
+        return self.total - self.drawn
+
+    @property
+    def rows(self) -> int:
+        return max(len(column.cells) for column in self.columns)
+
+class SessionStore:
     def __init__(self, directory: Path = SESSION_DIR) -> None:
         self.directory = Path(directory)
         self._lock = RLock()
@@ -67,12 +94,23 @@ class SessionStore:
         with self._lock:
             return self._view(self._load(session_id))
 
+    # Return caller information and the matrix from the same disk snapshot.
+    def overview(self, session_id: str) -> tuple[SessionView, MatrixView]:
+        with self._lock:
+            session = self._load(session_id)
+            return self._view(session), self._matrix_view(session)
+
+    # Read the complete call pool and drawn flags from one saved snapshot.
+    def matrix(self, session_id: str) -> MatrixView:
+        with self._lock:
+            return self._matrix_view(self._load(session_id))
+
     def list_sessions(self) -> list[tuple[str, SessionView]]:
         with self._lock:
             if not self.directory.exists():
                 return []
             result = []
-            for path in sorted(self.directory.glob("*.json")):
+            for path in sorted(self.directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
                 if _SESSION_ID.fullmatch(path.stem):
                     result.append((path.stem, self._view(self._load(path.stem))))
             return result
@@ -108,6 +146,32 @@ class SessionStore:
             for path in paths:
                 path.unlink()
             return len(paths)
+
+    @staticmethod
+    def _matrix_view(session: GameSession) -> MatrixView:
+        # Comparing full Call objects also distinguishes repeated header letters
+        # (e.g. APPLE) and repeated values in different columns.
+        history = session.history
+        called = set(history)
+        latest = history[-1] if history else None
+        columns = tuple(
+            MatrixColumn(
+                letter=column["letter"],
+                cells=tuple(
+                    MatrixCell(value=entry.value, drawn=entry in called, latest=entry == latest)
+                    for entry in (Call(index, column["letter"], value) for value in column["items"])
+                ),
+            )
+            for index, column in enumerate(session.game["columns"])
+        )
+        return MatrixView(
+            name=session.game["name"],
+            word=session.game["word"],
+            columns=columns,
+            drawn=session.cursor,
+            total=len(session.deck),
+            current=str(latest) if latest else None,
+        )
 
     @staticmethod
     def _view(session: GameSession) -> SessionView:

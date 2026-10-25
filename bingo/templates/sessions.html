@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Saved sessions{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h1>Your sessions.</h1><p class="subline">Games are saved automatically after every draw.</p></div><a class="button button-primary" href="/ui/games">＋ Start a game</a></div>
+{% if sessions %}
+<div class="session-list">
+  {% for session_id, view in sessions %}
+    <article class="session-card"><div class="session-overview"><div><span class="tag">{{ view.word }}</span><h2>{{ view.name }}</h2><p class="muted">{% if view.remaining %}{{ view.remaining }} calls remaining{% else %}All calls drawn{% endif %}</p></div><div class="session-activity"><span>{{ view.drawn }} <span class="muted">/ {{ view.total }}</span></span><small>CALLS DRAWN</small></div></div>
+      <progress value="{{ view.drawn }}" max="{{ view.total }}">{{ view.drawn }} / {{ view.total }}</progress>
+      <div class="session-actions"><a class="button button-primary button-small" href="/ui/sessions/{{ session_id }}">{% if view.remaining %}Resume game{% else %}View results{% endif %} →</a><a class="button button-quiet button-small" href="/ui/sessions/{{ session_id }}/reset">Reset</a><a class="button button-quiet button-small" href="/ui/sessions/{{ session_id }}/delete">Delete</a></div>
+    </article>
+  {% endfor %}
+</div>
+<div class="danger-footer"><span>Only finished with these sessions?</span><a href="/ui/sessions/clear">Clear all session history →</a></div>
+{% else %}
+<div class="empty-state"><div class="empty-circle">↺</div><h2>No saved sessions</h2><p>Start a game, and it will appear here automatically.</p><a class="button button-primary" href="/ui/games">Choose a game →</a></div>
+{% endif %}
+{% endblock %}

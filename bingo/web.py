@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 from .sessions import SessionStore, SessionView
 from .storage import CONFIG_PATH, GAME_DIR, list_games, load_config, save_config, save_game
@@ -33,6 +34,7 @@ def _session_lines(session_id: str, view: SessionView, limit: int) -> list[str]:
     lines.extend([
         "",
         f"GET /ui/sessions/{session_id} - Browser controls",
+        f"GET /ui/sessions/{session_id}/matrix - Visual draw matrix",
         f"POST /sessions/{session_id}/next - Draw next call",
         f"GET /sessions/{session_id}/history - Full history",
         f"POST /sessions/{session_id}/reset - Reshuffle and restart",
@@ -45,7 +47,7 @@ def create_app(
     config_path: Path = CONFIG_PATH,
     session_directory: Path | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Bingo Studio", description="JSON-based Bingo caller with minimal HTML forms")
+    app = FastAPI(title="Bingo Studio", description="JSON-based Bingo caller with a minimal web UI")
     sessions = SessionStore(session_directory or Path(game_directory).parent / "sessions")
 
     def available_games() -> list[tuple[Path, dict]]:
@@ -179,6 +181,17 @@ def create_app(
         view = session_action(sessions.status, session_id)
         return "\n".join(_session_lines(session_id, view, config()["history_limit"])) + "\n"
 
+    @app.get("/sessions/{session_id}/matrix", response_class=PlainTextResponse)
+    def text_matrix(session_id: str) -> str:
+        matrix = session_action(sessions.matrix, session_id)
+        lines = [f"CALL MATRIX — {matrix.name} [{matrix.word}]",
+                 f"Drawn: {matrix.drawn} / {matrix.total}",
+                 "✓ = drawn  · = not drawn", ""]
+        for index, column in enumerate(matrix.columns, start=1):
+            lines.append(f"Column {index} ({column.letter})")
+            lines.extend(f"  {'✓' if cell.drawn else '·'} {cell.value}" for cell in column.cells)
+        return "\n".join(lines) + "\n"
+
     @app.post("/sessions/{session_id}/next", response_class=PlainTextResponse)
     def next_draw(session_id: str) -> str:
         call, view = session_action(sessions.next, session_id)
@@ -209,7 +222,11 @@ def create_app(
         count = sessions.clear()
         return f"Cleared {count} saved session(s). Game definitions are unchanged.\n"
 
-    app.include_router(build_ui_router(sessions, available_games, find_game))
+    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+    app.include_router(build_ui_router(
+        sessions, available_games, find_game,
+        game_directory=Path(game_directory), config_path=Path(config_path),
+    ))
     return app
 
 app = create_app()

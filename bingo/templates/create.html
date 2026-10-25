@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Create game{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h1>{% if source_name %}Customize a game.{% else %}Create a game.{% endif %}</h1><p class="subline">{% if source_name %}Start from {{ source_name }} and save an independent copy.{% else %}Give it a name, choose five letters, and add your calls.{% endif %}</p></div></div>
+<div class="create-layout">
+  <section class="editor-panel">
+    {% if error %}<div role="alert" class="error-note">{{ error }}</div>{% endif %}
+    <form method="post" action="/ui/create-game">
+      <div class="form-row"><div class="field"><label for="game_name">Game name</label><input id="game_name" name="name" required maxlength="100" placeholder="e.g. Friday Game Night" value="{{ name }}"></div><div class="field field-word"><label for="game_word">Five-letter heading</label><input id="game_word" name="word" required minlength="5" maxlength="5" pattern="[a-zA-Z]{5}" value="{{ word }}" spellcheck="false" autocapitalize="characters" aria-describedby="word_hint"><small id="word_hint">Try BINGO, FLAME, or APPLE.</small></div></div>
+      <div class="editor-divider"><div><h2>Column entries</h2><p>One call per line. Each column needs at least one unique entry.</p></div></div>
+      <div class="editor-columns">{% for col in columns %}<div class="field column-editor"><label for="items_{{ col.index }}">Column {{ col.number }} <span class="letter-badge" data-column-letter="{{ col.index }}">{{ col.letter }}</span></label><textarea id="items_{{ col.index }}" name="items_{{ col.index }}" rows="7" placeholder="One item per line" spellcheck="false">{{ col.text }}</textarea></div>{% endfor %}</div>
+      <label class="check-field"><input type="checkbox" name="free_center" value="true" {% if free_center %}checked{% endif %}><span>Use a free center square <small>Used when printable cards are added later</small></span></label>
+      <div class="form-footer"><button class="button button-primary" type="submit">Save game →</button><a class="button button-quiet" href="/ui/games">Cancel</a></div>
+    </form>
+  </section>
+  <aside class="import-panel"><p class="eyebrow">HAVE A FILE?</p><h2>Import from JSON.</h2><p>Already made a game definition? Upload it here. We’ll validate it and add it to your library.</p>
+    {% if import_error %}<div role="alert" class="error-note">{{ import_error }}</div>{% endif %}
+    <form method="post" action="/ui/import-game" enctype="multipart/form-data"><label for="game_json" class="upload-label">Choose a .json file</label><input id="game_json" type="file" name="file" accept=".json,application/json" required><button class="button button-outline button-full" type="submit">Import game →</button></form>
+    <div class="import-foot"><span>SUPPORTED</span><strong>JSON · 256 KB max</strong></div>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', path='/app.js') }}" defer></script>{% endblock %}

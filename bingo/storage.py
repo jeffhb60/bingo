@@ -11,7 +11,29 @@ ROOT = Path(__file__).resolve().parent.parent
 GAME_DIR = ROOT / "games"
 SESSION_DIR = ROOT / "sessions"
 CONFIG_PATH = ROOT / "config.json"
-DEFAULT_CONFIG = {"history_limit": 5}
+DEFAULT_CONFIG = {
+    "history_limit": 5,
+    "site_title": "Bingo Studio",
+    "tagline": "Your game night, made simple.",
+    "accent": "lime",
+}
+ACCENTS = {"lime": "#c4fa74", "sky": "#7dd3fc", "rose": "#fda4af", "violet": "#c4b5fd", "amber": "#ffce73"}
+
+def validate_config(config: dict, *, current: dict | None = None) -> dict:
+    if not isinstance(config, dict):
+        raise ValueError("Configuration must be a JSON object.")
+    result = {**DEFAULT_CONFIG, **(current or {}), **config}
+    limit = result.get("history_limit")
+    if type(limit) is not int or not 0 <= limit <= 50:
+        raise ValueError("history_limit must be an integer between 0 and 50.")
+    for key, maximum in (("site_title", 60), ("tagline", 140)):
+        value = result.get(key)
+        if not isinstance(value, str) or not 1 <= len(value.strip()) <= maximum:
+            raise ValueError(f"{key} must contain 1 to {maximum} characters.")
+        result[key] = value.strip()
+    if result.get("accent") not in ACCENTS:
+        raise ValueError("accent must be lime, sky, rose, violet, or amber.")
+    return {key: result[key] for key in DEFAULT_CONFIG}
 
 def load_game(path: Path) -> dict:
     try:
@@ -49,15 +71,11 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Invalid configuration: {exc}") from exc
-    if not isinstance(value, dict) or type(value.get("history_limit")) is not int or not 0 <= value["history_limit"] <= 50:
-        raise ValueError("Configuration must have an integer 'history_limit' from 0 to 50.")
-    return {"history_limit": value["history_limit"]}
+    return validate_config(value)
 
 def save_config(config: dict, path: Path = CONFIG_PATH) -> None:
-    limit = config.get("history_limit")
-    if type(limit) is not int or not 0 <= limit <= 50:
-        raise ValueError("history_limit must be an integer between 0 and 50.")
-    write_json_atomic(path, {"history_limit": limit})
+    current = load_config(path)
+    write_json_atomic(path, validate_config(config, current=current))
 
 # Save JSON via a temporary file and atomic replacement (single-host storage).
 def write_json_atomic(path: Path, data: dict) -> None:

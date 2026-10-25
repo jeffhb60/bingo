@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Call matrix · {{ matrix.name }}{% endblock %}
+{% block content %}
+<div class="page-heading matrix-heading">
+  <div>
+    <a class="back-link" href="/ui/sessions/{{ session_id }}">← Back to caller</a>
+    <p class="eyebrow">ALL POSSIBLE CALLS</p>
+    <h1>Call matrix.</h1>
+    <p class="subline">{{ matrix.name }} · {{ matrix.word }} · Track every call at a glance.</p>
+  </div>
+  <div class="top-actions">
+    <a href="/ui/sessions/{{ session_id }}/matrix" class="button button-outline button-small">↻ Refresh</a>
+    <a href="/ui/sessions/{{ session_id }}" class="button button-primary button-small">Return to game →</a>
+  </div>
+</div>
+
+<div class="matrix-summary" aria-label="Draw progress">
+  <div><span class="matrix-summary-label">DRAWN</span><strong>{{ matrix.drawn }} <small>/ {{ matrix.total }}</small></strong></div>
+  <div><span class="matrix-summary-label">REMAINING</span><strong>{{ matrix.remaining }}</strong></div>
+  <div><span class="matrix-summary-label">LATEST CALL</span><strong class="matrix-summary-current">{{ matrix.current or '—' }}</strong></div>
+</div>
+
+{% include '_matrix_grid.html' %}
+{% endblock %}

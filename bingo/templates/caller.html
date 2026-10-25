@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Calling {{ view.name }}
+<dialog id="call-matrix-dialog" class="matrix-modal" aria-labelledby="matrix-modal-title" aria-describedby="matrix-modal-description">
+  <div class="matrix-modal-header">
+    <div><p class="eyebrow">VERIFY A WINNING CALL</p><h2 id="matrix-modal-title">Check {{ view.word }} calls</h2>
+      <p id="matrix-modal-description">✓ marks drawn calls. The gold outline identifies the latest draw.</p></div>
+    <form method="dialog"><button type="submit" class="matrix-modal-close" aria-label="Close call matrix" title="Close (Esc)">×</button></form>
+  </div>
+  <div class="matrix-modal-content">
+    <div class="matrix-modal-summary"><span><strong>{{ matrix.drawn }}</strong> / {{ matrix.total }} drawn</span><span>{{ matrix.remaining }} remaining</span><span>Latest: <strong>{{ matrix.current or '—' }}</strong></span></div>
+    {% set matrix_embedded = true %}
+    {% include '_matrix_grid.html' %}
+    <p class="matrix-modal-note">This shows the official draw record. Compare it with the player's card to verify a win.</p>
+  </div>
+  <div class="matrix-modal-footer">
+    <a class="back-link" href="/ui/sessions/{{ session_id }}/matrix">Full-page matrix ↗</a>
+    <form method="dialog"><button type="submit" class="button button-outline button-small">Close</button></form>
+  </div>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', path='/matrix-modal.js') }}" defer></script>{% endblock %}
+{% block content %}
+<div class="caller-heading"><div><a class="back-link" href="/ui/sessions">← All sessions</a><p class="eyebrow"><span class="status-dot"></span> {% if view.remaining %}GAME IN PROGRESS{% else %}GAME COMPLETE{% endif %}</p><h1>{{ view.name }}</h1></div><div class="top-actions"><a href="/ui/sessions/{{ session_id }}/matrix" class="button button-primary button-small" data-open-matrix>✓ Check {{ view.word }} calls</a><a href="/ui/sessions/{{ session_id }}/reset" class="button button-outline button-small">↻ Reset</a><a href="/ui/sessions/{{ session_id }}/delete" class="button button-quiet button-small">Delete</a></div></div>
+<div class="caller-layout">
+  <section class="draw-stage" aria-label="Current bingo draw">
+    <div class="draw-stage-top"><span>NOW CALLING</span><span>{{ view.word }}</span></div>
+    <div class="draw-area">
+      <div class="previous-call"><span>PREVIOUS</span><strong>{{ view.previous or '—' }}</strong></div>
+      <p class="draw-caption">CURRENT DRAW</p>
+      <div class="current-call{% if view.current and ": " in view.current %} current-call-word{% endif %}" aria-live="polite">{{ view.current or 'READY' }}</div>
+      <p class="draw-support">{% if not view.drawn %}Press the button below to call your first item.{% elif not view.remaining %}All calls have been drawn.{% else %}One random call at a time. No repeats.{% endif %}</p>
+    </div>
+    <div class="draw-footer">
+      {% if view.remaining %}
+        <form method="post" action="/ui/sessions/{{ session_id }}/next"><button type="submit" class="button button-primary button-draw">Draw next <span aria-hidden="true">→</span></button></form>
+      {% else %}
+        <a class="button button-outline button-draw" href="/ui/sessions/{{ session_id }}/reset">Restart this game ↻</a>
+      {% endif %}
+      <div class="progress-head"><span>Progress</span><strong>{{ view.drawn }} / {{ view.total }}</strong></div>
+      <progress class="draw-progress" value="{{ view.drawn }}" max="{{ view.total }}">{{ percentage }}%</progress>
+      <div class="progress-meta"><span>{{ view.remaining }} remaining</span><span>{{ percentage }}% complete</span></div>
+    </div>
+  </section>
+  <aside class="history-panel"><div class="history-head"><div><p class="eyebrow">TRACK THE GAME</p><h2>Draw history</h2></div><span class="history-total">{{ view.drawn }}</span></div>
+    {% if history %}
+      <ol class="history-list">{% for index, call in history %}<li><span class="history-num">{{ '%02d'|format(index) }}</span><span class="history-call">{{ call }}</span>{% if loop.first %}<span class="history-latest">LATEST</span>{% endif %}</li>{% endfor %}</ol>
+    {% else %}
+      <div class="history-empty"><span class="empty-symbol">◌</span><p>No draws yet.</p><small>Your called items will appear here.</small></div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

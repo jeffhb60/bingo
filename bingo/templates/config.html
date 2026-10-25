@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">PREFERENCES</p><h1>Settings.</h1><p class="subline">A few simple options for your game caller.</p></div></div>
+<div class="settings-panel">
+  {% if saved %}<div role="status" class="success-note">✓ Your preferences have been saved.</div>{% endif %}
+  {% if error %}<div role="alert" class="error-note">{{ error }}</div>{% endif %}
+  <form method="post" action="/ui/config">
+    <div class="setting-row"><div><label for="history_limit" class="setting-label">Recent calls to display</label><p class="muted">Controls the number of recent calls shown in the plain-text API. The browser caller keeps the complete history.</p></div><input id="history_limit" name="history_limit" type="number" min="0" max="50" step="1" required value="{{ settings.history_limit }}"></div>
+    <div class="settings-section-title"><h2>Appearance</h2><p class="muted">Give Bingo Studio your own event name and accent color.</p></div>
+    <div class="setting-row"><div><label class="setting-label" for="site_title">Site name</label><p class="muted">Shown in the header and homepage.</p></div><input id="site_title" name="site_title" type="text" maxlength="60" required value="{{ settings.site_title }}"></div>
+    <div class="setting-row"><div><label class="setting-label" for="tagline">Tagline</label><p class="muted">A short welcome message for players.</p></div><input id="tagline" name="tagline" type="text" maxlength="140" required value="{{ settings.tagline }}"></div>
+    <div class="setting-row"><div><label class="setting-label" for="accent">Accent color</label><p class="muted">Choose an accessible highlight color.</p></div>
+      <select id="accent" name="accent" class="theme-select">
+        {% for value, label in [('lime','Fresh lime'),('sky','Sky blue'),('rose','Soft rose'),('violet','Lavender'),('amber','Warm amber')] %}
+          <option value="{{ value }}" {% if settings.accent == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-footer"><button class="button button-primary" type="submit">Save changes</button></div>
+  </form>
+  <div class="data-note"><h2>About your data</h2><p>Game templates live in <code>games/</code>. Active games live in <code>sessions/</code>. Everything is stored locally as JSON.</p><a class="text-link" href="/ui/sessions">Manage saved sessions →</a></div>
+</div>
+{% endblock %}

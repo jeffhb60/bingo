@@ -1,0 +1,40 @@
+<section class="matrix-panel" aria-label="All possible calls and which have been drawn">
+  <div class="matrix-panel-top">
+    <div class="matrix-legend" aria-label="Matrix legend">
+      <span><span class="matrix-legend-check" aria-hidden="true">✓</span> Drawn</span>
+      <span><span class="matrix-legend-open" aria-hidden="true">○</span> Not drawn</span>
+      <span><span class="matrix-legend-latest" aria-hidden="true"></span> Latest draw</span>
+    </div>
+    <p>On small screens, swipe sideways to see all five columns →</p>
+  </div>
+  <div class="matrix-scroll" role="region" tabindex="0" aria-label="Scrollable call matrix">
+    <table class="call-matrix">
+      <caption class="sr-only">{{ matrix.name }}: {{ matrix.drawn }} of {{ matrix.total }} calls drawn. Each marked cell shows a drawn call.</caption>
+      <thead><tr>{% for column in matrix.columns %}<th scope="col">{{ column.letter }} <small>Column {{ loop.index }}</small></th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in range(matrix.rows) %}
+          <tr>
+            {% for column in matrix.columns %}
+              {% if row < column.cells|length %}
+                {% set cell = column.cells[row] %}
+                <td class="matrix-cell{% if cell.drawn %} is-drawn{% endif %}{% if cell.latest %} is-latest{% endif %}" aria-label="{{ column.letter }} column {{ loop.index }}: {{ cell.value }} — {% if cell.drawn %}drawn{% else %}not drawn{% endif %}{% if cell.latest %}, most recent{% endif %}">
+                  <span class="matrix-cell-body">
+                    <span class="matrix-cell-value">{{ cell.value }}</span>
+                    <span class="matrix-cell-check" aria-hidden="true">{% if cell.drawn %}✓{% else %}○{% endif %}</span>
+                  </span>
+                </td>
+              {% else %}
+                <td class="matrix-cell is-empty" aria-label="No entry"></td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if matrix_embedded|default(false) %}
+  <div class="matrix-bottom"><span>Updated after each draw · Green ✓ = picked · Gold border = latest</span></div>
+  {% else %}
+  <div class="matrix-bottom"><span>Use Refresh to see any newly drawn calls.</span><a class="back-link" href="/ui/sessions/{{ session_id }}">← Continue calling</a></div>
+  {% endif %}
+</section>
