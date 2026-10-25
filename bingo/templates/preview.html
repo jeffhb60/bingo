@@ -3,7 +3,7 @@
 {% block content %}
 <a class="back-link" href="/ui/games">← All games</a>
 <div class="page-heading preview-heading"><div><p class="eyebrow">GAME PREVIEW</p><h1>{{ game.name }}</h1><p class="subline">{{ total }} available calls · {% if game.free_center %}Free center enabled{% else %}No free center{% endif %}</p></div>
-<div class="preview-actions"><a class="button button-outline" href="/ui/customize/{{ game_id|url_path }}">Customize a copy</a><form method="post" action="/ui/start/{{ game_id|url_path }}"><button class="button button-primary" type="submit">Start game <span aria-hidden="true">→</span></button></form></div></div>
+<div class="preview-actions"><a class="button button-outline" href="/ui/customize/{{ game_id|url_path }}">Customize a copy</a><form method="post" action="/ui/start/{{ game_id|url_path }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-primary" type="submit">Start game <span aria-hidden="true">→</span></button></form></div></div>
 <div class="preview-letters" aria-label="Game header">{% for letter in game.word %}<span>{{ letter }}</span>{% endfor %}</div>
 <div class="section-heading"><div><p class="eyebrow">CALL POOL</p><h2>What’s in this game</h2></div></div>
 <div class="column-grid">

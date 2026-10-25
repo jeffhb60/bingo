@@ -5,12 +5,14 @@ import json
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .sessions import SessionStore, SessionView
 from .storage import ACCENTS, load_config, save_config, save_game
+from .tenant import tenant_for
+from .auth import matches_csrf
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 TEMPLATES.env.filters["url_path"] = lambda value: quote(str(value), safe="")
@@ -35,56 +37,67 @@ def _column_fields(word: str, values: list[str]) -> list[dict]:
     labels = word.upper() if len(word) == 5 and word.isascii() and word.isalpha() else "BINGO"
     return [{"number": i + 1, "index": i, "letter": labels[i], "text": values[i]} for i in range(5)]
 
-def build_ui_router(store: SessionStore, available_games, find_game, *, game_directory: Path, config_path: Path) -> APIRouter:
-    router = APIRouter()
+async def require_form_csrf(request: Request):
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    form = await request.form()
+    if not matches_csrf(request.state.login.csrf, form.get("csrf_token")):
+        raise HTTPException(403, "Invalid form security token. Reload the page and try again.")
+
+def build_ui_router() -> APIRouter:
+    router = APIRouter(dependencies=[Depends(require_form_csrf)])
 
     def page(request: Request, template: str, **context):
-        branding = load_config(config_path)
+        tenant = tenant_for(request)
+        branding = load_config(tenant.config_path)
         return _page(request, template, branding=branding,
+                     username=request.state.login.user.username,
+                     csrf_token=request.state.login.csrf,
                      accent_color=ACCENTS[branding["accent"]], **context)
 
     @router.get("/", response_class=HTMLResponse)
     def home(request: Request):
-        games = available_games()
-        sessions = store.list_sessions()
+        games = tenant_for(request).games()
+        sessions = tenant_for(request).sessions.list_sessions()
         return page(request, "home.html", active="home", game_count=len(games), session_count=len(sessions), recent_sessions=sessions[:3])
 
     @router.get("/ui/games", response_class=HTMLResponse)
     def choose_game(request: Request):
         games = [{"id": path.stem, "game": game,
                   "total": sum(len(col["items"]) for col in game["columns"])}
-                 for path, game in available_games()]
+                 for path, game in tenant_for(request).games()]
         return page(request, "games.html", active="play", games=games)
 
     @router.get("/play/{game_id}", response_class=HTMLResponse)
     def game_preview(request: Request, game_id: str):
-        game = find_game(game_id)
+        game = tenant_for(request).find_game(game_id)
         total = sum(len(col["items"]) for col in game["columns"])
         return page(request, "preview.html", active="play", game=game, game_id=game_id, total=total)
 
     @router.post("/ui/start/{game_id}")
-    def start_game(game_id: str):
-        sid, _ = store.start(find_game(game_id))
+    def start_game(request: Request, game_id: str):
+        tenant = tenant_for(request)
+        sid, _ = tenant.sessions.start(tenant.find_game(game_id))
         return RedirectResponse(f"/ui/sessions/{sid}", status_code=303)
 
     @router.get("/ui/sessions", response_class=HTMLResponse)
     def saved_sessions(request: Request):
-        return page(request, "sessions.html", active="sessions", sessions=store.list_sessions())
+        return page(request, "sessions.html", active="sessions", sessions=tenant_for(request).sessions.list_sessions())
 
     @router.get("/ui/sessions/clear", response_class=HTMLResponse)
     def confirm_clear(request: Request):
         return page(request, "confirm.html", active="sessions", heading="Clear all sessions?",
-                     description=f"This permanently deletes {len(store.list_sessions())} saved session(s) and their draw histories. Game definitions are not affected.",
+                     description=f"This permanently deletes {len(tenant_for(request).sessions.list_sessions())} saved session(s) and their draw histories. Game definitions are not affected.",
                      action="/ui/sessions/clear", button_text="Clear all sessions", cancel_url="/ui/sessions")
 
     @router.post("/ui/sessions/clear")
-    def clear_sessions():
-        store.clear()
+    def clear_sessions(request: Request):
+        tenant_for(request).sessions.clear()
         return RedirectResponse("/ui/sessions", status_code=303)
 
     @router.get("/ui/sessions/{session_id}", response_class=HTMLResponse)
     def current_game(request: Request, session_id: str):
-        view, matrix = _action(store.overview, session_id)
+        view, matrix = _action(tenant_for(request).sessions.overview, session_id)
         history = list(reversed(list(enumerate(view.history, start=1))))
         return page(request, "caller.html", active="sessions", session_id=session_id,
                      view=view, matrix=matrix, history=history,
@@ -92,44 +105,44 @@ def build_ui_router(store: SessionStore, available_games, find_game, *, game_dir
 
     @router.get("/ui/sessions/{session_id}/matrix", response_class=HTMLResponse)
     def called_matrix(request: Request, session_id: str):
-        matrix = _action(store.matrix, session_id)
+        matrix = _action(tenant_for(request).sessions.matrix, session_id)
         return page(request, "matrix.html", active="sessions", session_id=session_id,
                      matrix=matrix)
 
     @router.post("/ui/sessions/{session_id}/next")
-    def draw_next(session_id: str):
-        _action(store.next, session_id)
+    def draw_next(request: Request, session_id: str):
+        _action(tenant_for(request).sessions.next, session_id)
         return RedirectResponse(f"/ui/sessions/{session_id}", status_code=303)
 
     @router.get("/ui/sessions/{session_id}/reset", response_class=HTMLResponse)
     def confirm_reset(request: Request, session_id: str):
-        view = _status(store, session_id)
+        view = _status(tenant_for(request).sessions, session_id)
         return page(request, "confirm.html", active="sessions", heading=f"Restart {view.name}?",
                      description=f"This clears {view.drawn} drawn call(s) and reshuffles the game. The session will be kept.",
                      action=f"/ui/sessions/{session_id}/reset", button_text="Reset and reshuffle",
                      cancel_url=f"/ui/sessions/{session_id}")
 
     @router.post("/ui/sessions/{session_id}/reset")
-    def reset_session(session_id: str):
-        _action(store.reset, session_id)
+    def reset_session(request: Request, session_id: str):
+        _action(tenant_for(request).sessions.reset, session_id)
         return RedirectResponse(f"/ui/sessions/{session_id}", status_code=303)
 
     @router.get("/ui/sessions/{session_id}/delete", response_class=HTMLResponse)
     def confirm_delete(request: Request, session_id: str):
-        view = _status(store, session_id)
+        view = _status(tenant_for(request).sessions, session_id)
         return page(request, "confirm.html", active="sessions", heading=f"Delete {view.name}?",
                      description="The saved session and draw history will be permanently deleted. The game definition stays available.",
                      action=f"/ui/sessions/{session_id}/delete", button_text="Delete session",
                      cancel_url="/ui/sessions")
 
     @router.post("/ui/sessions/{session_id}/delete")
-    def delete_session(session_id: str):
-        _action(store.delete, session_id)
+    def delete_session(request: Request, session_id: str):
+        _action(tenant_for(request).sessions.delete, session_id)
         return RedirectResponse("/ui/sessions", status_code=303)
 
     @router.get("/ui/config", response_class=HTMLResponse)
     def config_page(request: Request):
-        return page(request, "config.html", active="config", settings=load_config(config_path),
+        return page(request, "config.html", active="config", settings=load_config(tenant_for(request).config_path),
                      saved=request.query_params.get("saved") == "1")
 
     @router.post("/ui/config", response_class=HTMLResponse)
@@ -140,7 +153,7 @@ def build_ui_router(store: SessionStore, available_games, find_game, *, game_dir
         try:
             limit = int(history_limit)
             save_config({"history_limit": limit, "site_title": site_title,
-                         "tagline": tagline, "accent": accent}, config_path)
+                         "tagline": tagline, "accent": accent}, tenant_for(request).config_path)
         except ValueError as exc:
             return page(request, "config.html", active="config", settings={"history_limit": history_limit, "site_title": site_title,
                                     "tagline": tagline, "accent": accent}, error=str(exc))
@@ -154,7 +167,7 @@ def build_ui_router(store: SessionStore, available_games, find_game, *, game_dir
     @router.get("/ui/customize/{game_id}", response_class=HTMLResponse)
     def customize_game(request: Request, game_id: str):
         """Create a new template from a copy; the existing game stays unchanged."""
-        game = find_game(game_id)
+        game = tenant_for(request).find_game(game_id)
         return page(request, "create.html", active="create",
                     name=game["name"] + " Custom", word=game["word"],
                     free_center=game["free_center"],
@@ -179,11 +192,11 @@ def build_ui_router(store: SessionStore, available_games, find_game, *, game_dir
                         for i, text in enumerate(raw_values)],
         }
         try:
-            path = save_game(data, game_directory)
+            path = save_game(data, tenant_for(request).games_dir)
         except ValueError as exc:
             return page(request, "create.html", active="create", name=name, word=word,
                          free_center=free_center, columns=_column_fields(word, raw_values), error=str(exc))
-        return RedirectResponse(f"/play/{quote(path.stem, safe='')}", status_code=303)
+        return RedirectResponse(f"/play/custom-{quote(path.stem, safe='')}", status_code=303)
 
     @router.post("/ui/import-game", response_class=HTMLResponse)
     async def import_game(request: Request, file: UploadFile = File(...)):
@@ -194,12 +207,12 @@ def build_ui_router(store: SessionStore, available_games, find_game, *, game_dir
             if len(content) > 256 * 1024:
                 raise ValueError("The JSON file must be 256 KB or smaller.")
             game = json.loads(content.decode("utf-8-sig"))
-            path = save_game(game, game_directory)
+            path = save_game(game, tenant_for(request).games_dir)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
             return page(request, "create.html", active="create", name="", word="BINGO", free_center=True,
                          columns=_column_fields("BINGO", [""] * 5), import_error=str(exc))
         finally:
             await file.close()
-        return RedirectResponse(f"/play/{quote(path.stem, safe='')}", status_code=303)
+        return RedirectResponse(f"/play/custom-{quote(path.stem, safe='')}", status_code=303)
 
     return router

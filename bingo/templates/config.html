@@ -5,7 +5,7 @@
 <div class="settings-panel">
   {% if saved %}<div role="status" class="success-note">✓ Your preferences have been saved.</div>{% endif %}
   {% if error %}<div role="alert" class="error-note">{{ error }}</div>{% endif %}
-  <form method="post" action="/ui/config">
+  <form method="post" action="/ui/config"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="setting-row"><div><label for="history_limit" class="setting-label">Recent calls to display</label><p class="muted">Controls the number of recent calls shown in the plain-text API. The browser caller keeps the complete history.</p></div><input id="history_limit" name="history_limit" type="number" min="0" max="50" step="1" required value="{{ settings.history_limit }}"></div>
     <div class="settings-section-title"><h2>Appearance</h2><p class="muted">Give Bingo Studio your own event name and accent color.</p></div>
     <div class="setting-row"><div><label class="setting-label" for="site_title">Site name</label><p class="muted">Shown in the header and homepage.</p></div><input id="site_title" name="site_title" type="text" maxlength="60" required value="{{ settings.site_title }}"></div>
@@ -19,6 +19,6 @@
     </div>
     <div class="form-footer"><button class="button button-primary" type="submit">Save changes</button></div>
   </form>
-  <div class="data-note"><h2>About your data</h2><p>Game templates live in <code>games/</code>. Active games live in <code>sessions/</code>. Everything is stored locally as JSON.</p><a class="text-link" href="/ui/sessions">Manage saved sessions →</a></div>
+  <div class="data-note"><h2>About your data</h2><p>Your custom games, active sessions, and appearance settings belong only to your account. The shared default BINGO game is available to everyone.</p><a class="text-link" href="/ui/sessions">Manage saved sessions →</a></div>
 </div>
 {% endblock %}

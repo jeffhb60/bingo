@@ -1,2 +1,9 @@
 .idea/
 .venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+private/
+sessions/
+.env
+*.sqlite3*

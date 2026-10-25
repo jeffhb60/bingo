@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>Sign in · Bingo Studio</title><link rel="stylesheet" href="/static/app.css"></head>
+<body><main class="auth-shell"><section class="auth-card"><p class="eyebrow">BINGO STUDIO</p><h1>Welcome back.</h1><p class="subline">Sign in to your private games, sessions, and settings.</p>
+{% if error %}<div class="error-note" role="alert">{{ error }}</div>{% endif %}
+<form action="/login" method="post"><input type="hidden" name="csrf_token" value="{{ pre_token }}">
+<label for="username">Username</label><input id="username" name="username" type="text" autocomplete="username" maxlength="40" required autofocus>
+<label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+<button class="button button-primary button-full" type="submit">Sign in →</button>
+</form><p class="muted small">Need an account? Ask the Bingo Studio administrator. Public sign-ups are disabled.</p></section></main></body></html>

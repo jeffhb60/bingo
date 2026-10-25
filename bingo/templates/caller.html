@@ -32,7 +32,7 @@
     </div>
     <div class="draw-footer">
       {% if view.remaining %}
-        <form method="post" action="/ui/sessions/{{ session_id }}/next"><button type="submit" class="button button-primary button-draw">Draw next <span aria-hidden="true">→</span></button></form>
+        <form method="post" action="/ui/sessions/{{ session_id }}/next"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="button button-primary button-draw">Draw next <span aria-hidden="true">→</span></button></form>
       {% else %}
         <a class="button button-outline button-draw" href="/ui/sessions/{{ session_id }}/reset">Restart this game ↻</a>
       {% endif %}

@@ -18,11 +18,12 @@
           <a href="/ui/sessions" {% if active == 'sessions' %}aria-current="page"{% endif %}>Sessions</a>
           <a href="/ui/create-game" {% if active == 'create' %}aria-current="page"{% endif %}>Create</a>
           <a href="/ui/config" {% if active == 'config' %}aria-current="page"{% endif %}>Settings</a>
+          <a href="/account" {% if active == 'account' %}aria-current="page"{% endif %}>Account</a>
         </nav>
       </div>
     </header>
     <main class="content" id="main-content">{% block content %}{% endblock %}</main>
-    <footer class="footer"><span>{{ branding.site_title }}</span><span>Game night control · <a href="/docs">API docs</a></span></footer>
+    <footer class="footer"><span>Signed in as <strong>{{ username }}</strong></span><span><form class="logout-form" action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="logout-button">Sign out</button></form></span></footer>
   </div>
   {% block scripts %}{% endblock %}
 </body>

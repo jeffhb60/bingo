@@ -1663,3 +1663,14 @@ code {
 @media(max-width:680px){ .brand-title{ max-width:160px; font-size:14px; } .theme-select{ width:100%; } }
 
 .preview-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:12px; }
+/* Private-account screens */
+.auth-shell { min-height:100vh;display:grid;place-items:center;padding:24px; }
+.auth-card { width:min(100%,440px);padding:clamp(24px,5vw,44px);border:1px solid var(--border, #364152);background:#151c29;border-radius:22px; }
+.auth-card h1 { font-size:clamp(2rem,5vw,3rem);margin:8px 0 12px; }
+.auth-card form { display:grid;gap:12px;margin:25px 0; }
+.auth-card label,.account-field label {font-weight:650;font-size:.95rem;}
+.auth-card input,.account-field input { width:100%;padding:13px 15px;background:#101725;color:#f8fafc;border:1px solid #4d5a6d;border-radius:10px; }
+.auth-card input:focus,.account-field input:focus { outline:2px solid var(--mint,#c4fa74);outline-offset:1px; }
+.logout-form {margin:0;display:inline-block;}
+.logout-button {border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;}
+.account-field {display:grid;gap:7px;margin:20px 0;max-width:440px;}
