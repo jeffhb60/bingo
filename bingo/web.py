@@ -6,7 +6,12 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import PlainTextResponse, RedirectResponse, HTMLResponse
+from fastapi.responses import (
+    PlainTextResponse,
+    RedirectResponse,
+    HTMLResponse,
+    Response
+)
 from fastapi.staticfiles import StaticFiles
 
 from .auth import AuthStore, add_session_cookie, cookie_name, matches_csrf
@@ -55,7 +60,7 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH,
     async def enforce_access(request: Request, call_next):
         path = request.url.path
         # Only static assets and the login form are public. No open registration.
-        if path.startswith("/static/") or path == "/login":
+        if path.startswith("/static/") or path in ("/login", "/favicon.ico"):
             response = await call_next(request)
         else:
             token = request.cookies.get(cookie_name(secure_cookies))
@@ -81,6 +86,10 @@ def create_app(game_directory: Path = GAME_DIR, config_path: Path = CONFIG_PATH,
         if prod:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        return Response(status_code=204)
 
     @app.get("/login", response_class=HTMLResponse)
     def login_page(request: Request):
